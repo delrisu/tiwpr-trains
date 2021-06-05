@@ -1,4 +1,4 @@
-package pl.delrisu.trains.model.dao;
+package pl.delrisu.trains.model;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import javax.persistence.Id;
 
 @Data
 @Entity
-public class TypeDAO {
+public class Type {
 
     @Id
     private String code;
