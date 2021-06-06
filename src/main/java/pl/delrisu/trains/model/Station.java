@@ -15,7 +15,7 @@ public class Station {
     @Id
     private String stationCode;
     private String fullName;
-    @OneToMany(cascade = CascadeType.ALL)
+    @OneToMany(cascade = CascadeType.ALL, mappedBy = "station")
     private List<Silo> silos;
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "station")
     private List<Train> trains;

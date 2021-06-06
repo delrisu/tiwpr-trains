@@ -10,6 +10,6 @@ import javax.persistence.Id;
 public class Type {
 
     @Id
-    private String code;
+    private String typeCode;
     private String fullName;
 }

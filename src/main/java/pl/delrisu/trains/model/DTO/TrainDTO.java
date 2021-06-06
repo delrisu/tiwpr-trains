@@ -6,8 +6,8 @@ import javax.validation.constraints.NotBlank;
 
 @Data
 public class TrainDTO {
-    @NotBlank(message = "Code must be provided")
-    private String code;
+    @NotBlank(message = "Train code must be provided")
+    private String trainCode;
     @NotBlank(message = "Full name must be provided")
     private String fullName;
     @NotBlank(message = "Type code must be provided")

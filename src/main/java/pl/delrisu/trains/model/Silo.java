@@ -16,5 +16,6 @@ public class Silo {
     @ManyToOne(cascade = CascadeType.ALL)
     private Type type;
     @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "stationCode")
     private Station station;
 }

@@ -12,6 +12,6 @@ public interface TypeRepository extends JpaRepository<Type, String> {
 
     List<Type> findAll();
 
-    Optional<Type> findByCode(String code);
+    Optional<Type> findByTypeCode(String code);
 
 }
