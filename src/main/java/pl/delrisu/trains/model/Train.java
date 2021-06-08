@@ -12,10 +12,10 @@ public class Train {
     @Id
     private String trainCode;
     private String fullName;
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     private Type type;
     private BigDecimal load;
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     @JoinColumn(name = "stationCode")
     private Station station;
 }

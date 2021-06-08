@@ -4,11 +4,12 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.delrisu.trains.mapper.CustomMapper;
-import pl.delrisu.trains.model.DTO.SiloDTO;
 import pl.delrisu.trains.model.DTO.TrainDTO;
 import pl.delrisu.trains.model.DTO.TransshipmentDTO;
+import pl.delrisu.trains.model.POST.SiloPOST;
 import pl.delrisu.trains.model.POST.StationPOST;
 import pl.delrisu.trains.model.*;
+import pl.delrisu.trains.model.PUT.TrainPUT;
 import pl.delrisu.trains.repository.*;
 
 import javax.transaction.Transactional;
@@ -49,25 +50,25 @@ public class ShipmentService {
             Train train = optionalTrain.get();
             Station station = optionalStation.get();
 
-            if (train.getStation().getStationCode().equals(station.getStationCode())) {
-                if (silos.size() != 0) {
-                    switch (transshipmentDTO.getDirection()) {
-                        case STATION_TO_TRAIN:
-                            transshipment.setLoad(silos.get(0).getLoad());
-                            train.setLoad(train.getLoad().add(silos.get(0).getLoad()));
-                            silos.get(0).setLoad(BigDecimal.valueOf(0));
-                            break;
-                        case TRAIN_TO_STATION:
-                            transshipment.setLoad(train.getLoad());
-                            silos.get(0).setLoad(train.getLoad().add(silos.get(0).getLoad()));
-                            train.setLoad(BigDecimal.valueOf(0));
-                            break;
-                    }
-                    siloRepository.save(silos.get(0));
-                    trainRepository.save(train);
-                    transshipmentRepository.save(transshipment);
+            if (silos.size() != 0) {
+                train.setStation(station);
+                switch (transshipmentDTO.getDirection()) {
+                    case STATION_TO_TRAIN:
+                        transshipment.setLoad(silos.get(0).getLoad());
+                        train.setLoad(train.getLoad().add(silos.get(0).getLoad()));
+                        silos.get(0).setLoad(BigDecimal.valueOf(0));
+                        break;
+                    case TRAIN_TO_STATION:
+                        transshipment.setLoad(train.getLoad());
+                        silos.get(0).setLoad(train.getLoad().add(silos.get(0).getLoad()));
+                        train.setLoad(BigDecimal.valueOf(0));
+                        break;
                 }
+                siloRepository.save(silos.get(0));
+                trainRepository.save(train);
+                transshipmentRepository.save(transshipment);
             }
+
             return transshipment;
         } else {
             return null;
@@ -94,13 +95,32 @@ public class ShipmentService {
     }
 
     @Transactional
-    public Silo prepareSilo(String stationCode, SiloDTO siloDTO) {
+    public Train prepareTrain(TrainPUT trainPUT, String trainCode) {
+
+        Train train = new Train();
+        train.setTrainCode(trainCode);
+        train.setFullName(trainPUT.getFullName());
+        train.setLoad(trainPUT.getLoad());
+
+        Optional<Type> optionalType = typeRepository.findByTypeCode(trainPUT.getTypeCode());
+        optionalType.ifPresent(train::setType);
+        Optional<Station> optionalStation = stationRepository.findByStationCode(trainPUT.getStationCode());
+        optionalStation.ifPresent(train::setStation);
+        if (train.getType() != null && train.getStation() != null) {
+            return train;
+        } else {
+            return null;
+        }
+    }
+
+    @Transactional
+    public Silo prepareSilo(String stationCode, SiloPOST siloPOST) {
 
         Silo silo = new Silo();
-        silo.setLoad(siloDTO.getLoad());
+        silo.setLoad(siloPOST.getLoad());
 
         Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
-        Optional<Type> optionalType = typeRepository.findByTypeCode(siloDTO.getTypeCode());
+        Optional<Type> optionalType = typeRepository.findByTypeCode(siloPOST.getTypeCode());
 
         if (optionalType.isPresent() && optionalStation.isPresent()) {
             silo.setType(optionalType.get());

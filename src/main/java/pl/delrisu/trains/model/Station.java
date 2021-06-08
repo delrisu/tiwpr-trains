@@ -17,6 +17,6 @@ public class Station {
     private String fullName;
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "station")
     private List<Silo> silos;
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "station")
+    @OneToMany(mappedBy = "station")
     private List<Train> trains;
 }

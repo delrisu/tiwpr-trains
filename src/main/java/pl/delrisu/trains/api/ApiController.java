@@ -1,6 +1,8 @@
 package pl.delrisu.trains.api;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -11,15 +13,19 @@ import pl.delrisu.trains.model.DTO.SiloDTO;
 import pl.delrisu.trains.model.DTO.StationDTO;
 import pl.delrisu.trains.model.DTO.TrainDTO;
 import pl.delrisu.trains.model.DTO.TransshipmentDTO;
+import pl.delrisu.trains.model.POST.SiloPOST;
 import pl.delrisu.trains.model.POST.StationPOST;
 import pl.delrisu.trains.model.*;
+import pl.delrisu.trains.model.PUT.TrainPUT;
 import pl.delrisu.trains.repository.*;
 import pl.delrisu.trains.service.ShipmentService;
 
+import javax.transaction.Transactional;
 import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.util.*;
 
+@Slf4j
 @RequestMapping("api/v1")
 @RestController
 public class ApiController {
@@ -35,8 +41,6 @@ public class ApiController {
     TrainRepository trainRepository;
     @Autowired
     TransshipmentRepository transshipmentRepository;
-
-
     @Autowired
     TypeRepository typeRepository;
 
@@ -44,9 +48,14 @@ public class ApiController {
     CustomMapper customMapper;
 
     @GetMapping("/trains")
-    public List<TrainDTO> getAllTrains() {
+    public List<TrainDTO> getAllTrains(@RequestParam(required = false) Optional<Integer> page) {
         List<TrainDTO> trainDTOs = new ArrayList<>();
-        trainRepository.findAll().forEach(train -> trainDTOs.add(customMapper.mapTrainToTrainDTO(train)));
+        if(page.isPresent()){
+            trainRepository.findAll(PageRequest.of(page.get(),5)).forEach(train -> trainDTOs
+                    .add(customMapper.mapTrainToTrainDTO(train)));
+        }else {
+            trainRepository.findAll().forEach(train -> trainDTOs.add(customMapper.mapTrainToTrainDTO(train)));
+        }
         return trainDTOs;
     }
 
@@ -62,13 +71,87 @@ public class ApiController {
 
     @PostMapping("/trains")
     public ResponseEntity<?> postTrain(@Valid @RequestBody TrainDTO trainDTO) {
-        Train train = shipmentService.prepareTrain(trainDTO);
 
-        if (train != null) {
-            trainRepository.save(train);
-            return ResponseEntity.ok(trainDTO);
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainDTO.getTrainCode());
+        Optional<Station> optionalStation = stationRepository.findByStationCode(trainDTO.getStationCode());
+        Optional<Type> optionalType = typeRepository.findByTypeCode(trainDTO.getTypeCode());
+
+        if(!optionalStation.isPresent()){
+            return ResponseEntity.badRequest().body("There is no station with that code");
+        }
+
+        if(!optionalType.isPresent()){
+            return ResponseEntity.badRequest().body("There is no type with that code");
+        }
+
+        if(!optionalTrain.isPresent()) {
+            Train train = shipmentService.prepareTrain(trainDTO);
+
+            if (train != null) {
+                trainRepository.save(train);
+                return ResponseEntity.ok(trainDTO);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
         } else {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.ALREADY_REPORTED).body("Train with that code already exist");
+        }
+    }
+
+    @Transactional
+    @PutMapping("/trains/{trainCode}")
+    public ResponseEntity<?> putTrain(@Valid @RequestBody TrainPUT trainPUT, @PathVariable String trainCode){
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainCode);
+
+        if(optionalTrain.isPresent()){
+            Train train = shipmentService.prepareTrain(trainPUT, trainCode);
+            if(train != null){
+                trainRepository.save(train);
+                return ResponseEntity.ok(trainPUT);
+            } else {
+                return ResponseEntity.badRequest().body("Station code or Type code don't match any existing entity");
+            }
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PatchMapping("/trains/{trainCode}")
+    public ResponseEntity<?> patchTrain(@RequestBody TrainPUT trainPUT, @PathVariable String trainCode){
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainCode);
+
+        if(optionalTrain.isPresent()){
+            Train train = optionalTrain.get();
+            if(trainPUT.getFullName() != null){
+                train.setFullName(trainPUT.getFullName());
+            }
+            if(trainPUT.getLoad() != null){
+                train.setLoad(trainPUT.getLoad());
+            }
+            if(trainPUT.getStationCode() != null){
+                Optional<Station> optionalStation = stationRepository.findByStationCode(trainPUT.getStationCode());
+                if(optionalStation.isPresent()){
+                    train.setStation(optionalStation.get());
+                } else {
+                    return ResponseEntity.badRequest().body("No station with given code");
+                }
+            }
+            trainRepository.save(train);
+            return ResponseEntity.ok(customMapper.mapTrainToTrainDTO(train));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @DeleteMapping("/trains/{trainCode}")
+    public ResponseEntity<?> deleteTrain(@PathVariable String trainCode){
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainCode);
+
+        if(optionalTrain.isPresent()){
+            trainRepository.delete(optionalTrain.get());
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -107,7 +190,7 @@ public class ApiController {
             optionalStation.get().getSilos().forEach(silo -> siloDTOs.add(customMapper.mapSiloToSiloDTO(silo)));
             return ResponseEntity.ok(siloDTOs);
         } else {
-            return ResponseEntity.badRequest().body("No station with that code");
+            return ResponseEntity.notFound().build();
         }
     }
 
@@ -125,8 +208,8 @@ public class ApiController {
     }
 
     @PostMapping("/station/{stationCode}/silo")
-    public ResponseEntity<?> postSilo(@PathVariable String stationCode, @Valid @RequestBody SiloDTO silo) {
-        Silo siloRet = shipmentService.prepareSilo(stationCode, silo);
+    public ResponseEntity<?> postSilo(@PathVariable String stationCode, @Valid @RequestBody SiloPOST siloPOST) {
+        Silo siloRet = shipmentService.prepareSilo(stationCode, siloPOST);
 
         if (siloRet != null) {
             return ResponseEntity.ok(customMapper.mapSiloToSiloDTO(siloRet));

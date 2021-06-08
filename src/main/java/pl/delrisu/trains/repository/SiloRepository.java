@@ -18,6 +18,6 @@ public interface SiloRepository extends JpaRepository<Silo, Long> {
 
     Optional<Silo> findByIdAndStation(Long Id, Station station);
 
-    Optional<Silo> getById(Long id);
+    Optional<Silo> findById(Long id);
 
 }
