@@ -16,6 +16,8 @@ public interface SiloRepository extends JpaRepository<Silo, Long> {
 
     List<Silo> findAllByStationAndType(Station station, Type type);
 
+    Optional<Silo> findByIdAndStation(Long Id, Station station);
+
     Optional<Silo> getById(Long id);
 
 }

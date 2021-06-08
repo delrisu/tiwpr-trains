@@ -10,19 +10,15 @@ import pl.delrisu.trains.mapper.CustomMapper;
 import pl.delrisu.trains.model.DTO.SiloDTO;
 import pl.delrisu.trains.model.DTO.StationDTO;
 import pl.delrisu.trains.model.DTO.TrainDTO;
+import pl.delrisu.trains.model.DTO.TransshipmentDTO;
 import pl.delrisu.trains.model.POST.StationPOST;
-import pl.delrisu.trains.model.Silo;
-import pl.delrisu.trains.model.Station;
-import pl.delrisu.trains.model.Train;
-import pl.delrisu.trains.model.Type;
+import pl.delrisu.trains.model.*;
 import pl.delrisu.trains.repository.*;
 import pl.delrisu.trains.service.ShipmentService;
 
 import javax.validation.Valid;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
 
 @RequestMapping("api/v1")
 @RestController
@@ -54,11 +50,14 @@ public class ApiController {
         return trainDTOs;
     }
 
-    @GetMapping("/stations")
-    public List<StationDTO> getAllStations(){
-        List<StationDTO> stationDTOs = new ArrayList<>();
-        stationRepository.findAll().forEach(station -> stationDTOs.add(customMapper.mapStationToStationDTO(station)));
-        return stationDTOs;
+    @GetMapping("/trains/{trainCode}")
+    public ResponseEntity<?> getTrainByCode(@PathVariable String trainCode) {
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainCode);
+        if (optionalTrain.isPresent()) {
+            return ResponseEntity.ok(customMapper.mapTrainToTrainDTO(optionalTrain.get()));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @PostMapping("/trains")
@@ -73,24 +72,102 @@ public class ApiController {
         }
     }
 
-    @PostMapping("/types")
-    public ResponseEntity<?> postType(@RequestBody Type type) {
-        return ResponseEntity.ok(typeRepository.save(type));
+    @PostMapping("/trains/{trainCode}/load")
+    public ResponseEntity<?> addLoadToTrain(@PathVariable String trainCode, @RequestBody BigDecimal load) {
+        Optional<Train> optionalTrain = trainRepository.findByTrainCode(trainCode);
+        if (optionalTrain.isPresent()) {
+            Train train = optionalTrain.get();
+            train.setLoad(train.getLoad().add(load));
+            trainRepository.save(train);
+            return ResponseEntity.ok(customMapper.mapTrainToTrainDTO(train));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/stations")
+    public List<StationDTO> getAllStations() {
+        List<StationDTO> stationDTOs = new ArrayList<>();
+        stationRepository.findAll().forEach(station -> stationDTOs.add(customMapper.mapStationToStationDTO(station)));
+        return stationDTOs;
     }
 
     @PostMapping("/stations")
-    public ResponseEntity<?> postStation(@RequestBody StationPOST stationPOST) {
+    public ResponseEntity<?> postStation(@Valid @RequestBody StationPOST stationPOST) {
         Station station = shipmentService.prepareStation(stationPOST);
         stationRepository.save(station);
         return ResponseEntity.ok(customMapper.mapStationToStationDTO(station));
     }
 
+    @GetMapping("/station/{stationCode}/silo")
+    public ResponseEntity<?> getAllSilos(@PathVariable String stationCode) {
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+
+        if (optionalStation.isPresent()) {
+            List<SiloDTO> siloDTOs = new ArrayList<>();
+            optionalStation.get().getSilos().forEach(silo -> siloDTOs.add(customMapper.mapSiloToSiloDTO(silo)));
+            return ResponseEntity.ok(siloDTOs);
+        } else {
+            return ResponseEntity.badRequest().body("No station with that code");
+        }
+    }
+
+    @GetMapping("/station/{stationCode}/silo/{siloId}")
+    public ResponseEntity<?> getSiloByStationAndSiloId(@PathVariable Long siloId, @PathVariable String stationCode) {
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+
+        if (optionalStation.isPresent()) {
+            Optional<Silo> optionalSilo = siloRepository.findByIdAndStation(siloId, optionalStation.get());
+            if (optionalSilo.isPresent()) {
+                return ResponseEntity.ok(customMapper.mapSiloToSiloDTO(optionalSilo.get()));
+            }
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @PostMapping("/station/{stationCode}/silo")
-    public ResponseEntity<?> postSilo(@PathVariable String stationCode, @RequestBody SiloDTO silo) {
+    public ResponseEntity<?> postSilo(@PathVariable String stationCode, @Valid @RequestBody SiloDTO silo) {
         Silo siloRet = shipmentService.prepareSilo(stationCode, silo);
 
         if (siloRet != null) {
             return ResponseEntity.ok(customMapper.mapSiloToSiloDTO(siloRet));
+        } else {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/types")
+    public List<Type> getAllTypes() {
+        return typeRepository.findAll();
+    }
+
+    @GetMapping("/types/{typeCode}")
+    public ResponseEntity<?> getTypeByCode(@PathVariable String typeCode) {
+        Optional<Type> optionalType = typeRepository.findByTypeCode(typeCode);
+
+        if (optionalType.isPresent()) {
+            return ResponseEntity.ok(optionalType.get());
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/types")
+    public ResponseEntity<?> postType(@Valid @RequestBody Type type) {
+        return ResponseEntity.ok(typeRepository.save(type));
+    }
+
+
+    @GetMapping("/transshipments")
+    public List<Transshipment> getAllTransshipments() {
+        return transshipmentRepository.findAll();
+    }
+
+
+    @PostMapping("/transshipments")
+    public ResponseEntity<?> postTransshipment(@Valid @RequestBody TransshipmentDTO transshipmentDTO) {
+        Transshipment transshipment = shipmentService.transship(transshipmentDTO);
+        if (transshipment != null) {
+            return ResponseEntity.ok(transshipment);
         } else {
             return ResponseEntity.badRequest().build();
         }

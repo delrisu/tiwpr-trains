@@ -3,18 +3,17 @@ package pl.delrisu.trains.service;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import pl.delrisu.trains.mapper.CustomMapper;
 import pl.delrisu.trains.model.DTO.SiloDTO;
 import pl.delrisu.trains.model.DTO.TrainDTO;
 import pl.delrisu.trains.model.DTO.TransshipmentDTO;
 import pl.delrisu.trains.model.POST.StationPOST;
-import pl.delrisu.trains.model.Silo;
-import pl.delrisu.trains.model.Station;
-import pl.delrisu.trains.model.Train;
-import pl.delrisu.trains.model.Type;
+import pl.delrisu.trains.model.*;
 import pl.delrisu.trains.repository.*;
 
 import javax.transaction.Transactional;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -34,13 +33,18 @@ public class ShipmentService {
     @Autowired
     TypeRepository typeRepository;
 
+    @Autowired
+    CustomMapper customMapper;
+
     @Transactional
-    public void transship(TransshipmentDTO transshipmentDTO) {
+    public Transshipment transship(TransshipmentDTO transshipmentDTO) {
         Optional<Train> optionalTrain = trainRepository.findByTrainCode(transshipmentDTO.getTrainCode());
         Optional<Station> optionalStation = stationRepository.findByStationCode(transshipmentDTO.getStationCode());
 
 
         if (optionalTrain.isPresent() && optionalStation.isPresent()) {
+            Transshipment transshipment = customMapper.mapTransshipmentDTOToTransshipment(transshipmentDTO);
+            transshipment.setDate(LocalDateTime.now());
             List<Silo> silos = siloRepository.findAllByStationAndType(optionalStation.get(), optionalTrain.get().getType());
             Train train = optionalTrain.get();
             Station station = optionalStation.get();
@@ -49,18 +53,24 @@ public class ShipmentService {
                 if (silos.size() != 0) {
                     switch (transshipmentDTO.getDirection()) {
                         case STATION_TO_TRAIN:
+                            transshipment.setLoad(silos.get(0).getLoad());
                             train.setLoad(train.getLoad().add(silos.get(0).getLoad()));
                             silos.get(0).setLoad(BigDecimal.valueOf(0));
                             break;
                         case TRAIN_TO_STATION:
+                            transshipment.setLoad(train.getLoad());
                             silos.get(0).setLoad(train.getLoad().add(silos.get(0).getLoad()));
                             train.setLoad(BigDecimal.valueOf(0));
                             break;
                     }
                     siloRepository.save(silos.get(0));
                     trainRepository.save(train);
+                    transshipmentRepository.save(transshipment);
                 }
             }
+            return transshipment;
+        } else {
+            return null;
         }
     }
 
@@ -70,6 +80,7 @@ public class ShipmentService {
         Train train = new Train();
         train.setTrainCode(trainDTO.getTrainCode());
         train.setFullName(trainDTO.getFullName());
+        train.setLoad(trainDTO.getLoad());
 
         Optional<Type> optionalType = typeRepository.findByTypeCode(trainDTO.getTypeCode());
         optionalType.ifPresent(train::setType);
@@ -99,7 +110,6 @@ public class ShipmentService {
             return siloRepository.save(silo);
         }
 
-        log.info("Silo noped");
         return null;
     }
 
