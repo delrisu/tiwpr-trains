@@ -22,6 +22,8 @@ import pl.delrisu.trains.service.ShipmentService;
 
 import javax.transaction.Transactional;
 import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.*;
 
@@ -174,6 +176,17 @@ public class ApiController {
         return stationDTOs;
     }
 
+    @GetMapping("/stations/{stationCode}")
+    public ResponseEntity<?> getStation(@PathVariable String stationCode){
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+
+        if(optionalStation.isPresent()){
+            return ResponseEntity.ok(customMapper.mapStationToStationDTO(optionalStation.get()));
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PostMapping("/stations")
     public ResponseEntity<?> postStation(@Valid @RequestBody StationPOST stationPOST) {
         Station station = shipmentService.prepareStation(stationPOST);
@@ -181,7 +194,7 @@ public class ApiController {
         return ResponseEntity.ok(customMapper.mapStationToStationDTO(station));
     }
 
-    @GetMapping("/station/{stationCode}/silo")
+    @GetMapping("/station/{stationCode}/silos")
     public ResponseEntity<?> getAllSilos(@PathVariable String stationCode) {
         Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
 
@@ -194,7 +207,7 @@ public class ApiController {
         }
     }
 
-    @GetMapping("/station/{stationCode}/silo/{siloId}")
+    @GetMapping("/station/{stationCode}/silos/{siloId}")
     public ResponseEntity<?> getSiloByStationAndSiloId(@PathVariable Long siloId, @PathVariable String stationCode) {
         Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
 
@@ -207,15 +220,69 @@ public class ApiController {
         return ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/station/{stationCode}/silo")
+    @DeleteMapping("/station/{stationCode}/silos/{siloId}")
+    ResponseEntity<?> deleteSilo(@PathVariable String stationCode,@PathVariable Long siloId){
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+
+        if (optionalStation.isPresent()) {
+            Optional<Silo> optionalSilo = siloRepository.findByIdAndStation(siloId, optionalStation.get());
+            if (optionalSilo.isPresent()) {
+                siloRepository.delete(optionalSilo.get());
+                return ResponseEntity.ok().build();
+            }
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping("/station/{stationCode}/silos")
     public ResponseEntity<?> postSilo(@PathVariable String stationCode, @Valid @RequestBody SiloPOST siloPOST) {
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+        if(!optionalStation.isPresent()){
+            return ResponseEntity.badRequest().body("No station with that code");
+        }
+        Optional<Type> optionalType = typeRepository.findByTypeCode(siloPOST.getTypeCode());
+        if(!optionalType.isPresent()){
+            return ResponseEntity.badRequest().body("No type with that code");
+        }
+
+        Optional<Silo> optionalSilo = siloRepository.findByStationAndType(optionalStation.get(), optionalType.get());
+
+        if(optionalSilo.isPresent()){
+            return ResponseEntity.status(HttpStatus.ALREADY_REPORTED).body("Silo with that type already exist in this station");
+        }
+
         Silo siloRet = shipmentService.prepareSilo(stationCode, siloPOST);
 
         if (siloRet != null) {
+            siloRepository.save(siloRet);
             return ResponseEntity.ok(customMapper.mapSiloToSiloDTO(siloRet));
         } else {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @PutMapping("/station/{stationCode}/silos/{id}")
+    public ResponseEntity<?> putSilo(@PathVariable String stationCode, @PathVariable Long id, @Valid @RequestBody SiloPOST siloPOST){
+        Optional<Station> optionalStation = stationRepository.findByStationCode(stationCode);
+        if(!optionalStation.isPresent()){
+            return ResponseEntity.badRequest().body("No station with that code");
+        }
+        Optional<Type> optionalType = typeRepository.findByTypeCode(siloPOST.getTypeCode());
+        if(!optionalType.isPresent()){
+            return ResponseEntity.badRequest().body("No type with that code");
+        }
+        Optional<Silo> optionalSilo = siloRepository.findById(id);
+        if(!optionalSilo.isPresent()){
+            return ResponseEntity.badRequest().body("No silo with that id");
+        }
+
+        Silo silo = optionalSilo.get();
+        silo.setLoad(siloPOST.getLoad());
+        silo.setStation(optionalStation.get());
+        silo.setType(optionalType.get());
+
+        siloRepository.save(silo);
+        return ResponseEntity.ok(customMapper.mapSiloToSiloDTO(silo));
     }
 
     @GetMapping("/types")
@@ -239,11 +306,36 @@ public class ApiController {
         return ResponseEntity.ok(typeRepository.save(type));
     }
 
+    @PatchMapping("/types/{typeCode}")
+    public ResponseEntity<?> putType(@PathVariable String typeCode, @NotBlank @RequestBody String fullName){
+        Optional<Type> optionalType = typeRepository.findByTypeCode(typeCode);
+
+        if(optionalType.isPresent()){
+            Type type = optionalType.get();
+            type.setFullName(fullName);
+            typeRepository.save(type);
+            return ResponseEntity.ok(type);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
 
     @GetMapping("/transshipments")
     public List<Transshipment> getAllTransshipments() {
         return transshipmentRepository.findAll();
     }
+
+    @GetMapping("/transshipments/{uuid}")
+    public ResponseEntity<?> getTransshipment(@PathVariable String uuid){
+        Optional<Transshipment> optionalTransshipment = transshipmentRepository.findByUuid(UUID.fromString(uuid));
+
+        if(optionalTransshipment.isPresent()){
+            return ResponseEntity.ok(optionalTransshipment.get());
+        }
+
+        return ResponseEntity.notFound().build();
+    }
+
 
 
     @PostMapping("/transshipments")

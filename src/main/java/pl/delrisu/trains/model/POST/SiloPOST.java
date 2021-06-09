@@ -8,7 +8,6 @@ import java.math.BigDecimal;
 
 @Data
 public class SiloPOST {
-    private Long id;
     @NotNull(message = "Load must be provided")
     private BigDecimal load;
     @NotBlank(message = "Type code must be provided")

@@ -127,7 +127,7 @@ public class ShipmentService {
             Station station = optionalStation.get();
             silo.setStation(station);
             station.getSilos().add(silo);
-            return siloRepository.save(silo);
+            return silo;
         }
 
         return null;
