@@ -1,6 +1,6 @@
 package pl.delrisu.trains.model.DTO;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import javax.validation.constraints.NotBlank;
@@ -8,6 +8,7 @@ import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class SiloDTO {
     private Long id;
     @NotNull(message = "Load must be provided")

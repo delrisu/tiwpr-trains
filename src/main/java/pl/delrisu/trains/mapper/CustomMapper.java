@@ -5,6 +5,7 @@ import pl.delrisu.trains.model.DTO.SiloDTO;
 import pl.delrisu.trains.model.DTO.StationDTO;
 import pl.delrisu.trains.model.DTO.TrainDTO;
 import pl.delrisu.trains.model.DTO.TransshipmentDTO;
+import pl.delrisu.trains.model.PUT.TrainPUT;
 import pl.delrisu.trains.model.Silo;
 import pl.delrisu.trains.model.Station;
 import pl.delrisu.trains.model.Train;
@@ -32,8 +33,12 @@ public class CustomMapper {
         SiloDTO siloDTO = new SiloDTO();
         siloDTO.setId(silo.getId());
         siloDTO.setLoad(silo.getLoad());
-        siloDTO.setTypeCode(silo.getType().getTypeCode());
-        siloDTO.setStationCode(silo.getStation().getStationCode());
+        if(silo.getType() != null) {
+            siloDTO.setTypeCode(silo.getType().getTypeCode());
+        }
+        if(silo.getStation() != null) {
+            siloDTO.setStationCode(silo.getStation().getStationCode());
+        }
 
         return siloDTO;
     }
